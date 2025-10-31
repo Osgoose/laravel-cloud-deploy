@@ -370,6 +370,13 @@
     #shopping-app .s-selected-emoji span:first-child { color:var(--color-text-secondary); }
     #shopping-app .s-selected-emoji-preview { font-size:var(--font-size-lg); margin-left:var(--space-8); }
 
+    #shopping-app .s-lists-grid:has(.s-empty-state) {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 400px;
+    }
+
     @media (max-width:768px){
       #shopping-app .s-view{ padding:var(--space-16); }
       #shopping-app .s-app-title{ font-size:var(--font-size-3xl); }
@@ -451,32 +458,89 @@
                   </button>
                 </div>
 <div class="flex flex-fil gap-2">
- @if (session('status'))
-    <div class="text-sm" style="display:inline-block; margin-top:6px; color: var(--color-success);">
-      {{ session('status') }}
-    </div>
-  @endif
 
-  @error('email')
-    <div class="text-sm" style="display:inline-block; margin-top:6px; color: var(--color-error);">
-      {{ $message }}
-    </div>
-  @enderror
-<form action="{{ route('lists.share', $current->id) }}" method="post" class="flex flex-fil gap-2" style="max-width: 480px;">
-  @csrf
-  <input id="share-email" type="email" name="email" class="s-input" placeholder="correo@ejemplo.com" required>
-  <button type="submit" class="s-btn s-btn--secondary">Compartir</button>
-</form>
+{{-- Botón único para abrir modal de compartir --}}
+<button type="button" class="s-btn s-btn--secondary" data-open="#s-modal-share-list">
+  <span aria-hidden="true">🔗</span>&nbsp; Compartir
+</button>
 
-@php $noShares = \App\Models\ShoppingListShare::where('shopping_list_id', $current->id)->doesntExist(); @endphp
-<form action="{{ route('lists.unshareAll', $current->id) }}" method="post" class="inline-block">
-  @csrf
-  <button type="submit"
-          class="s-btn s-btn--danger"
-          @if($noShares) disabled aria-disabled="true" @endif>
-    Dejar de compartir
-  </button>
-</form>
+{{-- Modal: Gestionar compartición --}}
+@php $openShareModal = session('share_modal_open') === true; @endphp
+<div id="s-modal-share-list" class="s-modal {{ $openShareModal ? '' : 's-hidden' }}" role="dialog" aria-modal="true" aria-labelledby="s-share-list-title">
+  <div class="s-modal-content s-modal-content--lg">
+    <div class="s-modal-header">
+      <h3 id="s-share-list-title" class="s-modal-title">Compartir lista</h3>
+      <button type="button" class="s-close-btn" data-close>&times;</button>
+    </div>
+
+    <div class="s-modal-body">
+      {{-- Form para añadir un correo --}}
+      <form action="{{ route('lists.share', $current->id) }}" method="post" class="flex flex-col gap-2">
+        @csrf
+        <label for="share-email" class="s-form-label">Correo del colaborador</label>
+        <div class="flex flex-row">
+        <input id="share-email" type="email" name="email" class="s-input" style="margin-right: 10px" placeholder="correo@ejemplo.com" required>
+        <button type="submit" class="s-btn s-btn--primary">Compartir</button>
+        </div>
+
+        @if (session('status'))
+          <div class="text-sm" style="display:inline-block; margin-top:6px; color: var(--color-success);">
+            {{ session('status') }}
+          </div>
+        @endif
+
+        @error('email')
+          <div class="text-sm" style="display:inline-block; margin-top:6px; color: var(--color-error);">
+            {{ $message }}
+          </div>
+        @enderror
+      </form>
+
+      {{-- Lista de correos con los que está compartida --}}
+      @php
+        $shares = \App\Models\ShoppingListShare::where('shopping_list_id', $current->id)
+          ->orderBy('email')
+          ->get(['email']);
+      @endphp
+
+      <div class="s-form-group" style="margin-top:20px;">
+        <label class="s-form-label">Compartido con</label>
+
+        @if($shares->isEmpty())
+          <div class="s-empty-state" style="padding:12px;">
+            <p class="m-0">Aún no has compartido esta lista con nadie.</p>
+          </div>
+        @else
+          <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px;">
+            @foreach($shares as $s)
+              <li style="display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid var(--color-card-border); border-radius:var(--radius-base); padding:8px 12px; background:var(--color-surface);">
+                <span style="color:var(--color-text)">{{ $s->email }}</span>
+                <form action="{{ route('lists.unshareOne', $current->id) }}" method="post" class="inline-block">
+                  @csrf
+                  <input type="hidden" name="email" value="{{ $s->email }}">
+                  <button type="submit" class="s-btn s-btn--outline">Eliminar</button>
+                </form>
+              </li>
+            @endforeach
+          </ul>
+        @endif
+      </div>
+    </div>
+
+    <div class="s-modal-actions">
+      <form action="{{ route('lists.unshareAll', $current->id) }}" method="post" class="inline-block">
+            @csrf
+            @php
+            $hasShares = \App\Models\ShoppingListShare::where('shopping_list_id', $current->id)->exists();
+            @endphp
+            <button type="submit" class="s-btn s-btn--danger" @if(!$hasShares) disabled aria-disabled="true" @endif>
+              Dejar de compartir
+            </button>
+          </form>
+    </div>
+  </div>
+</div>
+
 </div>
               </div>
 
